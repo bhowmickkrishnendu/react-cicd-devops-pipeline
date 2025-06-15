@@ -1,0 +1,112 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [dev, uat, main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Install Dependencies
+      working-directory: ./ui
+      run: npm install
+
+    - name: Run Unit Tests
+      working-directory: ./ui
+      run: npm test -- --watchAll=false
+
+    - name: SonarQube Scan
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+    - name: Login to GitHub Container Registry
+      run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build Docker Image
+      run: docker build -t ghcr.io/${{ github.repository }}:latest .
+
+    - name: Push Docker Image
+      run: docker push ghcr.io/${{ github.repository }}:latest
+
+    - name: Trivy Security Scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ghcr.io/${{ github.repository }}:latest
+        format: 'table'
+        exit-code: '0'
+        ignore-unfixed: true
+
+    - name: Deploy to DEV (on dev branch)
+      if: github.ref == 'refs/heads/dev'
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.DEV_HOST }}
+        username: ${{ secrets.DEV_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          docker pull ghcr.io/${{ github.repository }}:latest
+          docker stop reactapp || true && docker rm reactapp || true
+          docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
+
+    # - name: Deploy to UAT (on uat branch)
+    #   if: github.ref == 'refs/heads/uat'
+    #   uses: appleboy/ssh-action@v1.0.3
+    #   with:
+    #     host: ${{ secrets.UAT_HOST }}
+    #     username: ${{ secrets.UAT_USER }}
+    #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+    #     script: |
+    #       docker pull ghcr.io/${{ github.repository }}:latest
+    #       docker stop reactapp || true && docker rm reactapp || true
+    #       docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
+
+    # - name: Deploy to PROD (on main branch)
+    #   if: github.ref == 'refs/heads/main'
+    #   uses: appleboy/ssh-action@v1.0.3
+    #   with:
+    #     host: ${{ secrets.PROD_HOST }}
+    #     username: ${{ secrets.PROD_USER }}
+    #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+    #     script: |
+    #       docker pull ghcr.io/${{ github.repository }}:latest
+    #       docker stop reactapp || true && docker rm reactapp || true
+    #       docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
+
+    - name: Slack Notification
+      if: always()
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_MESSAGE: "✅ Deployment for branch `${{ github.ref_name }}` is complete."
+        SLACK_USERNAME: github-actions
+        SLACK_COLOR: good
+
+    # - name: Send Email Notification
+    #   if: always()
+    #   uses: dawidd6/action-send-mail@v3
+    #   with:
+    #     server_address: ${{ secrets.EMAIL_SERVER }}
+    #     server_port: 587
+    #     username: ${{ secrets.EMAIL_USERNAME }}
+    #     password: ${{ secrets.EMAIL_PASSWORD }}
+    #     subject: GitHub Actions - Deployment Status
+    #     body: |
+    #       GitHub Actions completed deployment for ${{ github.repository }} on branch ${{ github.ref_name }}.
+    #     to: ${{ secrets.EMAIL_TO }}
+    #     from: DevOps Pipeline <${{ secrets.EMAIL_USERNAME }}>
