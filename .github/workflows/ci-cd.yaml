@@ -59,11 +59,14 @@ jobs:
         host: ${{ secrets.DEV_HOST }}
         username: ${{ secrets.DEV_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 22
+        envs: GHCR_TOKEN
         script: |
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
           docker pull ghcr.io/${{ github.repository }}:latest
           docker stop reactapp || true && docker rm reactapp || true
           docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
+      
 
     # - name: Deploy to UAT (on uat branch)
     #   if: github.ref == 'refs/heads/uat'
