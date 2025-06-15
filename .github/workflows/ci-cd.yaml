@@ -60,9 +60,10 @@ jobs:
         username: ${{ secrets.DEV_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: 22
-        envs: GHCR_TOKEN
         script: |
-          echo "$GHCR_TOKEN" | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
+          echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
+          cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
+          rm /tmp/ghcr_token
           docker pull ghcr.io/${{ github.repository }}:latest
           docker stop reactapp || true && docker rm reactapp || true
           docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
