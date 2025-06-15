@@ -60,6 +60,7 @@ jobs:
         username: ${{ secrets.DEV_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
           docker pull ghcr.io/${{ github.repository }}:latest
           docker stop reactapp || true && docker rm reactapp || true
           docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
