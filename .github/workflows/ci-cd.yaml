@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [dev, uat, main]
+    branches: [dev]
 
 env:
   REGISTRY: ghcr.io
@@ -51,14 +51,16 @@ jobs:
         context: .
         platforms: linux/amd64,linux/arm64/v8
         push: true
-        tags: ghcr.io/${{ github.repository }}:latest
+        tags: |
+          ghcr.io/${{ github.repository }}:latest
+          ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
     - name: Trivy Security Scan
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ghcr.io/${{ github.repository }}:latest
+        image-ref: ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
         format: 'table'
         exit-code: '0'
         ignore-unfixed: true
@@ -75,9 +77,9 @@ jobs:
           echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
           cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
           rm /tmp/ghcr_token
-          docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:latest
+          docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
           docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
-          docker run -d --name reactapp --platform linux/arm64/v8 -p 3000:80 ghcr.io/${{ github.repository }}:latest
+          docker run -d --name reactapp --platform linux/arm64/v8 -p 3000:80 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
       
 
     # - name: Deploy to UAT (on uat branch)
@@ -92,9 +94,9 @@ jobs:
     #       echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
     #       cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
     #       rm /tmp/ghcr_token
-    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:latest
+    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
     #       docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
-    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3001:80 ghcr.io/${{ github.repository }}:latest
+    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3001:80 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
 
     # - name: Deploy to PROD (on main branch)
     #   if: github.ref == 'refs/heads/main'
@@ -108,9 +110,9 @@ jobs:
     #       echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
     #       cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
     #       rm /tmp/ghcr_token
-    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:latest
+    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
     #       docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
-    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3002:80 ghcr.io/${{ github.repository }}:latest
+    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3002:80 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}
 
 
     - name: Slack Notify (Success)
@@ -118,7 +120,7 @@ jobs:
       uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_MESSAGE: "✅ SUCCESS: Deployment for *${{ github.ref_name }}* completed successfully."
+        SLACK_MESSAGE: "✅ SUCCESS: Deployment for *${{ github.ref_name }}* completed successfully. Image: ghcr.io/${{ github.repository }}:${GITHUB_SHA::7}"
         SLACK_COLOR: good
     
     - name: Slack Notify (Failure)
