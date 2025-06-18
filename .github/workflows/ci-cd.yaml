@@ -87,10 +87,14 @@ jobs:
     #     host: ${{ secrets.UAT_HOST }}
     #     username: ${{ secrets.UAT_USER }}
     #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+    #     port: 22
     #     script: |
-    #       docker pull ghcr.io/${{ github.repository }}:latest
-    #       docker stop reactapp || true && docker rm reactapp || true
-    #       docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
+    #       echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
+    #       cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
+    #       rm /tmp/ghcr_token
+    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:latest
+    #       docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
+    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3001:80 ghcr.io/${{ github.repository }}:latest
 
     # - name: Deploy to PROD (on main branch)
     #   if: github.ref == 'refs/heads/main'
@@ -99,31 +103,48 @@ jobs:
     #     host: ${{ secrets.PROD_HOST }}
     #     username: ${{ secrets.PROD_USER }}
     #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+    #     port: 22
     #     script: |
-    #       docker pull ghcr.io/${{ github.repository }}:latest
-    #       docker stop reactapp || true && docker rm reactapp || true
-    #       docker run -d --name reactapp -p 80:80 ghcr.io/${{ github.repository }}:latest
+    #       echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
+    #       cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
+    #       rm /tmp/ghcr_token
+    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:latest
+    #       docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
+    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3002:80 ghcr.io/${{ github.repository }}:latest
 
 
-    - name: Slack Notification
-      if: always()
+    - name: Slack Notify (Success)
+      if: success()
       uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_MESSAGE: "✅ Deployment for branch `${{ github.ref_name }}` is complete."
-        SLACK_USERNAME: github-actions
+        SLACK_MESSAGE: "✅ SUCCESS: Deployment for *${{ github.ref_name }}* completed successfully."
         SLACK_COLOR: good
+    
+    - name: Slack Notify (Failure)
+      if: failure()
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_MESSAGE: |
+          ❌ *FAILED*: Deployment for *${{ github.ref_name }}* failed.
+          Check logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        SLACK_COLOR: danger
+        
 
-    # - name: Send Email Notification
-    #   if: always()
+    # - name: Send Email on Failure
+    #   if: failure()
     #   uses: dawidd6/action-send-mail@v3
     #   with:
     #     server_address: ${{ secrets.EMAIL_SERVER }}
     #     server_port: 587
     #     username: ${{ secrets.EMAIL_USERNAME }}
     #     password: ${{ secrets.EMAIL_PASSWORD }}
-    #     subject: GitHub Actions - Deployment Status
+    #     subject: ❌ GitHub CI/CD Failed on ${{ github.ref_name }}
     #     body: |
-    #       GitHub Actions completed deployment for ${{ github.repository }} on branch ${{ github.ref_name }}.
+    #       GitHub Actions failed during deployment for branch: ${{ github.ref_name }}
+    #       Repository: ${{ github.repository }}
+    #       Logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
     #     to: ${{ secrets.EMAIL_TO }}
-    #     from: DevOps Pipeline <${{ secrets.EMAIL_USERNAME }}>
+    #     from: DevOps CI/CD <${{ secrets.EMAIL_USERNAME }}>
+      
