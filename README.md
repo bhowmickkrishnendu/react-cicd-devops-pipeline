@@ -1,4 +1,4 @@
-# 🚀 CI/CD Pipeline for React App using GitHub Actions, GHCR, Docker & Appleboy SSH
+# 🚀 CI/CD Pipeline for React App using GitHub Actions, GHCR, SonarQube, Trivy, Docker & Appleboy SSH
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bhowmickkrishnendu/react-cicd-devops-pipeline/ci-cd.yaml)
 ![License](https://img.shields.io/github/license/bhowmickkrishnendu/react-cicd-devops-pipeline)
@@ -13,6 +13,7 @@ This project demonstrates a complete CI/CD pipeline setup for a production-grade
 * **GitHub Container Registry (GHCR)** for Docker image storage
 * **Multi-arch Docker builds** (linux/amd64 & linux/arm64)
 * **Secure deployment over SSH** using `appleboy/ssh-action`
+* **SonarQube** for Code Quality scanning
 * **Trivy** for vulnerability scanning
 * **Slack notification integration**
 
@@ -38,6 +39,7 @@ This project demonstrates a complete CI/CD pipeline setup for a production-grade
 * Deploys to 3 environments (DEV, UAT, PROD)
 * Builds multi-platform Docker images
 * Trivy-based image scanning for vulnerabilities
+* SonarQube scanning
 * Sends success/failure messages to Slack
 
 ---
@@ -67,13 +69,17 @@ Optional (for email):
 ## 📦 Project Structure
 
 ```
-├── .github/workflows
-│   └── ci-cd.yaml           # Workflow file
-├── ui/
-│   ├── Dockerfile           # Dockerfile for React app
-│   └── src/                 # React app source code
+react-cicd-devops-pipeline/
+├── ui/                            # React frontend
+│   ├── src/
+│   └── public/ 
+├── .github/workflows/ci-cd.yaml  # Main workflow
 ├── README.md
-└── ...
+├── Dockerfile
+├── docker-compose.yaml
+├── .env.example
+├── sonar-project.properties
+└── LICENSE ...
 ```
 
 ---
@@ -93,11 +99,14 @@ Optional (for email):
 ```
 react-cicd-devops-pipeline/
 ├── ui/                            # React frontend
-│   ├── Dockerfile
-│   ├── public/
-│   └── src/
+│   ├── src/
+│   └── public/ 
 ├── .github/workflows/ci-cd.yaml  # Main workflow
 ├── README.md
+├── Dockerfile
+├── docker-compose.yaml
+├── .env.example
+├── sonar-project.properties
 └── LICENSE
 ```
 
