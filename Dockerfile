@@ -13,9 +13,6 @@ RUN npm run build
 # Stage 2: Serve with nginx as non-root
 FROM nginx:alpine
 
-# Run as non-root user
-USER nginx
-
 # Copy built files
 COPY --from=build /app/build /usr/share/nginx/html
 
