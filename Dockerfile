@@ -1,22 +1,25 @@
-# Dockerfile
-# Base image
-FROM node:18-alpine as build
+# Stage 1: Build React app
+FROM node:18-alpine AS build
 
-# Set working directory
 WORKDIR /app
 
-# Copy source files
+# Install only with ignore-scripts for safety
 COPY ui/package*.json ./
-RUN npm install
+RUN npm install --ignore-scripts
 
 COPY ui/ ./
 RUN npm run build
 
-# Serve app with nginx
+# Stage 2: Serve with nginx as non-root
 FROM nginx:alpine
+
+# Run as non-root user
+USER nginx
+
+# Copy built files
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Copy custom nginx config (optional)
+# (Optional) Secure custom nginx config
 # COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
