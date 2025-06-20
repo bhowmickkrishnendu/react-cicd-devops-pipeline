@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
 
 env:
   REGISTRY: ghcr.io
@@ -69,8 +69,8 @@ jobs:
         exit-code: '0'
         ignore-unfixed: true
 
-    - name: Deploy to DEV (on dev branch)
-      if: github.ref == 'refs/heads/dev'
+    - name: Deploy to PROD (on main branch)
+      if: github.ref == 'refs/heads/main'
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.DEV_HOST }}
@@ -101,22 +101,6 @@ jobs:
     #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
     #       docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
     #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3001:80 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
-
-    # - name: Deploy to PROD (on main branch)
-    #   if: github.ref == 'refs/heads/main'
-    #   uses: appleboy/ssh-action@v1.0.3
-    #   with:
-    #     host: ${{ secrets.PROD_HOST }}
-    #     username: ${{ secrets.PROD_USER }}
-    #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-    #     port: 22
-    #     script: |
-    #       echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
-    #       cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
-    #       rm /tmp/ghcr_token
-    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
-    #       docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
-    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3002:80 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
 
 
     - name: Slack Notify (Success)
