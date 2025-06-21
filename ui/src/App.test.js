@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import App from './App';
 
@@ -15,7 +15,9 @@ describe('KrishnendusPage Component', () => {
   });
 
   test('renders header with full name and skill', () => {
-    render(<App />);
+    act(() => {
+      render(<App />);
+    });
     expect(screen.getByText('Krishnendu')).toBeInTheDocument();
     expect(screen.getByText('Bhowmick')).toBeInTheDocument();
     expect(screen.getByText(/Senior DevOps Engineer/i)).toBeInTheDocument();
@@ -117,11 +119,15 @@ describe('KrishnendusPage Component', () => {
     const firstSkill = screen.getByText(/🚀/);
     expect(firstSkill).toBeInTheDocument();
 
-    jest.advanceTimersByTime(3000);
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+
     await waitFor(() => {
       const updatedSkills = screen.getAllByText(/🚀/);
       expect(updatedSkills.length).toBeGreaterThan(0);
     });
+
     jest.useRealTimers();
   });
 });
