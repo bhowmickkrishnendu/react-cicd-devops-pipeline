@@ -553,26 +553,26 @@ export default function KrishnendusPage() {
         <h2 style={styles.sectionTitle}>About Me</h2>
         <div style={styles.aboutText}>
           <p style={styles.aboutParagraph}>
-            A keen learner, a universe of atoms, atoms of curiosity. Meet a tech mind shaped by both 
-            <span style={{color: '#60a5fa', fontWeight: '600'}}>discipline and wonder</span> — one that evolved from an 
-            <span style={{color: '#06b6d4', fontStyle: 'italic'}}>Infrastructure Specialist</span> into a dynamic 
-            <span style={{color: '#60a5fa', fontWeight: '600'}}>DevOps Engineer</span>, sculpting the future of software delivery.
+            A keen learner, a universe of atoms, atoms of curiosity. Meet a tech mind shaped by both{' '}
+            <span style={{color: '#60a5fa', fontWeight: '600'}}> discipline and wonder</span> — one that evolved from an{' '}
+            <span style={{color: '#06b6d4', fontStyle: 'italic'}}> Infrastructure Specialist</span> into a dynamic{' '}
+            <span style={{color: '#60a5fa', fontWeight: '600'}}> DevOps Engineer</span>, sculpting the future of software delivery.
           </p>
           <p style={styles.aboutParagraph}>
-            With over <span style={{color: '#06b6d4', fontWeight: '600'}}>9 years of experience</span>, I began by orchestrating Oracle applications and server landscapes. 
-            Today, I design scalable, reliable, and secure cloud-native infrastructure using 
-            <span style={{color: '#60a5fa', fontWeight: '600'}}>Kubernetes, Docker, and AWS.</span>
+            With over{' '}<span style={{color: '#06b6d4', fontWeight: '600'}}>9 years of experience</span>, I began by orchestrating Oracle applications and server landscapes. 
+            Today, I design scalable, reliable, and secure cloud-native infrastructure using{' '}
+            <span style={{color: '#60a5fa', fontWeight: '600'}}> Kubernetes, Docker, and AWS.</span>
           </p>
           <p style={styles.aboutParagraph}>
-            In the cloud realm, I architect solutions and automate lifecycles using the precision of 
-            <span style={{color: '#06b6d4', fontWeight: '600'}}>Terraform</span>, and integrate code workflows through 
-            <span style={{color: '#60a5fa', fontWeight: '600'}}>Git, Jenkins, GitLab,</span> and 
-            <span style={{color: '#6366f1', fontWeight: '600'}}>GitHub Actions</span>.
+            In the cloud realm, I architect solutions and automate lifecycles using the precision of{' '}
+            <span style={{color: '#06b6d4', fontWeight: '600'}}> Terraform</span>, and integrate code workflows through{' '}
+            <span style={{color: '#60a5fa', fontWeight: '600'}}> Git, Jenkins, GitLab,</span> and{' '}
+            <span style={{color: '#6366f1', fontWeight: '600'}}> GitHub Actions</span>.
           </p>
           <p style={styles.aboutParagraph}>
-            Every challenge I face is met with curiosity and a constant drive to improve. My work is not just code — it's craft. 
-            Every deployment is a composition. Every automated pipeline, a rhythm. 
-            <span style={{color: '#06b6d4', fontWeight: '600'}}>Let's create systems that not only work, but inspire.</span>
+            Every challenge I face is met with curiosity and a constant drive to improve. My work is not just code — it's craft.
+            Every deployment is a composition. Every automated pipeline, a rhythm.{'\n'}
+            <span style={{color: '#06b6d4', fontWeight: '600'}}> Let's create systems that not only work, but inspire.</span>
           </p>
         </div>
         
