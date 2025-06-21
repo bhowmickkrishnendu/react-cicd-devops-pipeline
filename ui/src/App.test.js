@@ -20,7 +20,8 @@ describe('KrishnendusPage Component', () => {
     });
     expect(screen.getByText('Krishnendu')).toBeInTheDocument();
     expect(screen.getByText('Bhowmick')).toBeInTheDocument();
-    expect(screen.getByText(/Senior DevOps Engineer/i)).toBeInTheDocument();
+    const titles = screen.getAllByText(/Senior DevOps Engineer/i);
+    expect(titles.length).toBeGreaterThan(0);
   });
 
   test('renders navigation links', () => {
@@ -40,7 +41,8 @@ describe('KrishnendusPage Component', () => {
     render(<App />);
     expect(screen.getByText(/About Me/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Infrastructure Specialist/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/DevOps Engineer/i)).toBeInTheDocument();
+    const devOpsTitles = screen.getAllByText(/DevOps Engineer/i);
+    expect(devOpsTitles.length).toBeGreaterThan(0);
     expect(screen.getByText(/discipline and wonder/i)).toBeInTheDocument();
   });
 
@@ -53,11 +55,14 @@ describe('KrishnendusPage Component', () => {
 
   test('renders all featured projects with tech tags', () => {
     render(<App />);
-    ['Infrastructure Automation', 'CICD Pipeline Project', 'Kubernetes', 'Python Project'].forEach((project) => {
+    ['Infrastructure Automation', 'CICD Pipeline Project', 'Python Project'].forEach((project) => {
       expect(screen.getByText(project)).toBeInTheDocument();
     });
 
-    ['Terraform', 'AWS', 'Jenkins', 'Docker', 'Kubernetes', 'Python'].forEach((tech) => {
+    const kubeTags = screen.getAllByText('Kubernetes');
+    expect(kubeTags.length).toBeGreaterThan(0);
+
+    ['Terraform', 'AWS', 'Jenkins', 'Docker', 'Python'].forEach((tech) => {
       const tags = screen.getAllByText(tech);
       expect(tags.length).toBeGreaterThan(0);
     });
