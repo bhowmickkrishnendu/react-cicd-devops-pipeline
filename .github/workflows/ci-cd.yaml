@@ -17,6 +17,8 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Fetch all history for accurate versioning
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
@@ -27,9 +29,19 @@ jobs:
       working-directory: ./ui
       run: npm install
 
-    - name: Run Unit Tests
+    - name: Run Unit Tests with Coverage
       working-directory: ./ui
-      run: npm test -- --watchAll=false
+      run: |
+        npm test -- --coverage --watchAll=false --collectCoverageFrom='src/**/*.{js,jsx}' --collectCoverageFrom='!src/index.js' --collectCoverageFrom='!src/reportWebVitals.js'
+      env:
+        CI: true
+
+    - name: List Coverage Files (Debug)
+      working-directory: ./ui
+      run: |
+        echo "Contents of coverage directory:"
+        ls -la coverage/ || echo "Coverage directory not found"
+        ls -la coverage/lcov-report/ || echo "LCOV report directory not found"
 
     - name: SonarQube Scan
       uses: sonarsource/sonarqube-scan-action@master
