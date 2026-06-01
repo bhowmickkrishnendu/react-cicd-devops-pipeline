@@ -1,0 +1,12 @@
+**/.git
+**/.github
+**/.idea
+**/.vscode
+**/node_modules
+**/coverage
+**/dist
+**/*.log
+README.md
+Implementation Notes.md
+.env
+.env.*

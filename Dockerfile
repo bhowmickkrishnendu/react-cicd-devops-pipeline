@@ -1,23 +1,51 @@
-# Stage 1: Build React app
-FROM node:18-alpine AS build
+# Stage 1: Build the static server
+FROM cgr.dev/chainguard/go:latest-dev AS server
 
-WORKDIR /app
+WORKDIR /src
 
-# Install only with ignore-scripts for safety
-COPY ui/package*.json ./
-RUN npm install --ignore-scripts
+ARG TARGETARCH
 
-COPY ui/ ./
-RUN npm run build
+RUN cat <<'EOF' > main.go
+package main
 
-# Stage 2: Serve with nginx as non-root
-FROM nginx:alpine
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+)
 
-# Copy built files
-COPY --from=build /app/build /usr/share/nginx/html
+func main() {
+	buildDir := "/app/build"
+	fileServer := http.FileServer(http.Dir(buildDir))
 
-# (Optional) Secure custom nginx config
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestPath := filepath.Clean(r.URL.Path)
+		candidatePath := filepath.Join(buildDir, requestPath)
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+		if info, err := os.Stat(candidatePath); err == nil && !info.IsDir() {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		http.ServeFile(w, r, filepath.Join(buildDir, "index.html"))
+	})
+
+	fmt.Println("serving static content on :8080")
+	if err := http.ListenAndServe(":8080", handler); err != nil {
+		panic(err)
+	}
+}
+EOF
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags='-s -w' -o /server main.go
+
+# Stage 2: Minimal runtime
+FROM scratch
+
+COPY --from=server /server /server
+COPY ui/build /app/build
+
+USER 65532:65532
+EXPOSE 8080
+ENTRYPOINT ["/server"]
