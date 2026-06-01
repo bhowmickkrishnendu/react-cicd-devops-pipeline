@@ -1,154 +1,212 @@
 name: CI/CD Pipeline
 
 on:
+  # push:
+  #   branches: [dev, uat, main]
   pull_request:
-    branches: [main]
-    types: [closed]
+    branches: [dev, uat, main]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: 18
 
 jobs:
-  build-and-deploy:
-    if: github.event.pull_request.merged == true
+  validate:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0  # Fetch all history for accurate versioning
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 18
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
 
-    - name: Install Dependencies
-      working-directory: ./ui
-      run: npm install
+      - name: Install Dependencies
+        working-directory: ./ui
+        run: npm ci
 
-    - name: Run Unit Tests with Coverage
-      working-directory: ./ui
-      run: |
-        npm test -- --coverage --watchAll=false --collectCoverageFrom='src/**/*.{js,jsx}' --collectCoverageFrom='!src/index.js' --collectCoverageFrom='!src/reportWebVitals.js'
-      env:
-        CI: true
+      - name: Run Unit Tests with Coverage
+        working-directory: ./ui
+        run: |
+          npm test -- --coverage --watchAll=false --collectCoverageFrom='src/**/*.{js,jsx}' --collectCoverageFrom='!src/index.js' --collectCoverageFrom='!src/reportWebVitals.js' --collectCoverageFrom='!src/setupTests.js'
+        env:
+          CI: true
 
-    - name: List Coverage Files (Debug)
-      working-directory: ./ui
-      run: |
-        echo "Contents of coverage directory:"
-        ls -la coverage/ || echo "Coverage directory not found"
-        ls -la coverage/lcov-report/ || echo "LCOV report directory not found"
+      - name: Build UI
+        working-directory: ./ui
+        run: npm run build
 
-    - name: SonarQube Scan
-      uses: sonarsource/sonarqube-scan-action@master
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - name: Upload UI Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-build
+          path: ui/build
+          if-no-files-found: error
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: bhowmickkrishnendu  
-        password: ${{ secrets.GHCR_TOKEN }}
+      - name: SonarQube Scan
+        if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_HOST_URL != '' }}
+        uses: sonarsource/sonarqube-scan-action@v4.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-    - name: Adding short SHA to image tag
-      id: short-sha
-      run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+  build-and-push:
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      short-sha: ${{ steps.short-sha.outputs.SHORT_SHA }}
 
-    - name: Build and Push Multi-Platform Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64/v8
-        push: true
-        tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Trivy Security Scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
-        format: 'table'
-        exit-code: '0'
-        ignore-unfixed: true
+      - name: Download UI Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-build
+          path: ui/build
 
-    - name: Deploy to PROD (on main branch)
-      if: github.event.pull_request.base.ref == 'main'
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.DEV_HOST }}
-        username: ${{ secrets.DEV_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        script: |
-          echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
-          cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
-          rm /tmp/ghcr_token
-          docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
-          docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
-          docker run -d --name reactapp --platform linux/arm64/v8 -p 3000:80 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
-      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    # - name: Deploy to UAT (on uat branch)
-    #   if: github.event.pull_request.base.ref == 'uat'
-    #   uses: appleboy/ssh-action@v1.0.3
-    #   with:
-    #     host: ${{ secrets.UAT_HOST }}
-    #     username: ${{ secrets.UAT_USER }}
-    #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-    #     port: 22
-    #     script: |
-    #       echo "${{ secrets.GHCR_TOKEN }}" > /tmp/ghcr_token
-    #       cat /tmp/ghcr_token | docker login ghcr.io -u bhowmickkrishnendu --password-stdin
-    #       rm /tmp/ghcr_token
-    #       docker pull --platform linux/arm64/v8 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
-    #       docker stop reactapp 2>/dev/null || true && docker rm reactapp 2>/dev/null || true
-    #       docker run -d --name reactapp --platform linux/arm64/v8 -p 3001:80 ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Add short SHA to image tag
+        id: short-sha
+        shell: bash
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-    - name: Slack Notify (Success)
-      if: success()
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_MESSAGE: "✅ SUCCESS: Deployment for *${{ github.ref_name }}* completed successfully. Image: ghcr.io/${{ github.repository }}:${{ steps.short-sha.outputs.SHORT_SHA }}"
-        SLACK_COLOR: good
-    
-    - name: Slack Notify (Failure)
-      if: failure()
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_MESSAGE: |
-          ❌ *FAILED*: Deployment for *${{ github.ref_name }}* failed.
-          Check logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        SLACK_COLOR: danger
-        
+      - name: Build and Push Multi-Platform Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64/v8
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.short-sha.outputs.SHORT_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    # - name: Send Email on Failure
-    #   if: failure()
-    #   uses: dawidd6/action-send-mail@v3
-    #   with:
-    #     server_address: ${{ secrets.EMAIL_SERVER }}
-    #     server_port: 587
-    #     username: ${{ secrets.EMAIL_USERNAME }}
-    #     password: ${{ secrets.EMAIL_PASSWORD }}
-    #     subject: ❌ GitHub CI/CD Failed on ${{ github.ref_name }}
-    #     body: |
-    #       GitHub Actions failed during deployment for branch: ${{ github.ref_name }}
-    #       Repository: ${{ github.repository }}
-    #       Logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-    #     to: ${{ secrets.EMAIL_TO }}
-    #     from: DevOps CI/CD <${{ secrets.EMAIL_USERNAME }}>
+      - name: Trivy Image Scan
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.short-sha.outputs.SHORT_SHA }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+
+  deploy:
+    needs: build-and-push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Resolve deployment target
+        id: deploy-target
+        shell: bash
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            dev)
+              echo "DEPLOY_HOST=${{ secrets.DEV_HOST }}" >> "$GITHUB_OUTPUT"
+              echo "DEPLOY_USER=${{ secrets.DEV_USER }}" >> "$GITHUB_OUTPUT"
+              echo "APP_PORT=3000" >> "$GITHUB_OUTPUT"
+              echo "ENV_LABEL=DEV" >> "$GITHUB_OUTPUT"
+              ;;
+            uat)
+              echo "DEPLOY_HOST=${{ secrets.UAT_HOST }}" >> "$GITHUB_OUTPUT"
+              echo "DEPLOY_USER=${{ secrets.UAT_USER }}" >> "$GITHUB_OUTPUT"
+              echo "APP_PORT=3001" >> "$GITHUB_OUTPUT"
+              echo "ENV_LABEL=UAT" >> "$GITHUB_OUTPUT"
+              ;;
+            main)
+              echo "DEPLOY_HOST=${{ secrets.PROD_HOST }}" >> "$GITHUB_OUTPUT"
+              echo "DEPLOY_USER=${{ secrets.PROD_USER }}" >> "$GITHUB_OUTPUT"
+              echo "APP_PORT=3002" >> "$GITHUB_OUTPUT"
+              echo "ENV_LABEL=PROD" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported branch: ${GITHUB_REF_NAME}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Deploy to target server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.deploy-target.outputs.DEPLOY_HOST }}
+          username: ${{ steps.deploy-target.outputs.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.short-sha }}"
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.repository_owner }} --password-stdin
+            docker pull --platform linux/arm64/v8 "$IMAGE"
+            docker stop reactapp 2>/dev/null || true
+            docker rm reactapp 2>/dev/null || true
+            docker run -d \
+              --name reactapp \
+              --restart unless-stopped \
+              --platform linux/arm64/v8 \
+              -p ${{ steps.deploy-target.outputs.APP_PORT }}:8080 \
+              "$IMAGE"
+            sleep 10
+            curl -f "http://localhost:${{ steps.deploy-target.outputs.APP_PORT }}"
+
+      - name: Slack Notify (Success)
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: "✅ SUCCESS: ${{ steps.deploy-target.outputs.ENV_LABEL }} deployment for *${{ github.ref_name }}* completed successfully. Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.short-sha }}"
+          SLACK_COLOR: good
+
+      - name: Slack Notify (Failure)
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: |
+            ❌ *FAILED*: Deployment for *${{ github.ref_name }}* failed.
+            Check logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_COLOR: danger
       
